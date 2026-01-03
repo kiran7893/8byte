@@ -119,18 +119,31 @@ export function parsePortfolioData(jsonData: JsonRow[]): Holding[] {
 
 /**
  * Load and parse portfolio data from data.json
+ * Import JSON directly for Vercel/serverless compatibility
  */
 export async function loadPortfolioData(): Promise<Holding[]> {
   try {
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const filePath = path.join(process.cwd(), "data.json");
-    const fileContents = await fs.readFile(filePath, "utf-8");
-    const jsonData: JsonRow[] = JSON.parse(fileContents);
+    // Import JSON file directly - Next.js will bundle it at build time
+    // This works in both local dev and Vercel/serverless environments
+    // Using relative path from app/lib to root data.json
+    const jsonData: JsonRow[] = await import("../../data.json").then(
+      (module) => (module.default as JsonRow[]) || (module as JsonRow[])
+    );
     return parsePortfolioData(jsonData);
   } catch (error) {
     console.error("Error loading portfolio data:", error);
-    return [];
+    // Fallback: try file system read for local development
+    try {
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const filePath = path.join(process.cwd(), "data.json");
+      const fileContents = await fs.readFile(filePath, "utf-8");
+      const jsonData: JsonRow[] = JSON.parse(fileContents);
+      return parsePortfolioData(jsonData);
+    } catch (fsError) {
+      console.error("Fallback file system read also failed:", fsError);
+      return [];
+    }
   }
 }
 
